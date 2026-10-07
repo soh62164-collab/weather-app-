@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#DFF1FF">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>আবহাওয়া</title>
+<style>
+:root{--sky:#E6F4FF;--sky2:#F7FBFF;--card:#fff;--ink:#1D3557;--mute:#5F7A96;--sun:#FFC24B;--cloud:#9DB7CE;--rain:#4FA3E0;--storm:#7C86C8;--line:#D3E6F5}
+*{box-sizing:border-box;margin:0}
+html,body{background:linear-gradient(#DFF1FF,#F7FBFF 60%);color:var(--ink);font-family:"Noto Sans Bengali","Hind Siliguri",system-ui,sans-serif;min-height:100%}
+main{max-width:560px;margin:auto;padding:max(16px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom))}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.place{font-size:1.05rem;font-weight:600}
+.sub{color:var(--mute);font-size:.85rem}
+button{font:inherit;border:0;background:var(--card);color:var(--ink);padding:8px 14px;border-radius:99px;box-shadow:0 1px 4px #4fa3e033;cursor:pointer}
+button:focus-visible{outline:3px solid var(--rain)}
+.now{text-align:center;padding:22px 0 14px}
+.now .ic{font-size:4.2rem;line-height:1}
+.now .t{font-size:4rem;font-weight:700;line-height:1.1}
+.now .d{font-size:1.1rem}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px}
+.chip{background:var(--card);border-radius:12px;padding:6px 12px;font-size:.85rem;color:var(--mute)}
+.chip b{color:var(--ink)}
+h2{font-size:1rem;margin:22px 0 4px}
+.note{font-size:.78rem;color:var(--mute);margin-bottom:8px}
+.hr{background:var(--card);border-radius:18px;padding:12px;margin-bottom:10px}
+.hr .row1{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.hr .tm{font-weight:600}
+.bar{display:grid;grid-template-columns:78px 1fr 44px;align-items:center;gap:8px;margin:4px 0;font-size:.85rem}
+.track{height:9px;border-radius:9px;background:#EAF3FA;overflow:hidden}
+.fill{height:100%;border-radius:9px}
+.bar span:last-child{text-align:right;color:var(--mute)}
+.day{display:grid;grid-template-columns:76px 34px 1fr auto;gap:8px;align-items:center;background:var(--card);border-radius:14px;padding:10px 12px;margin-bottom:6px;font-size:.9rem}
+.day .rn{color:var(--rain);font-size:.8rem}
+.day .mx{font-weight:600}.day .mn{color:var(--mute)}
+.msg{text-align:center;padding:40px 10px;color:var(--mute)}
+</style>
+</head>
+<body>
+<main>
+<div class="top">
+  <div><div class="place" id="place">অবস্থান খোঁজা হচ্ছে…</div><div class="sub" id="upd"></div></div>
+  <button id="re" aria-label="নতুন করে লোড করুন">রিফ্রেশ</button>
+</div>
+<div id="app"><div class="msg">আপনার সঠিক অবস্থান থেকে আবহাওয়া আনা হচ্ছে…<br>লোকেশন অনুমতি চাইলে "Allow" দিন।</div></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const bn=(n,o)=>Number(n).toLocaleString('bn-BD',o||{maximumFractionDigits:0});
+const WC={0:['☀️','পরিষ্কার আকাশ'],1:['🌤️','প্রায় পরিষ্কার'],2:['⛅','আংশিক মেঘলা'],3:['☁️','মেঘলা'],45:['🌫️','কুয়াশা'],48:['🌫️','ঘন কুয়াশা'],51:['🌦️','হালকা গুঁড়ি বৃষ্টি'],53:['🌦️','গুঁড়ি বৃষ্টি'],55:['🌧️','ঘন গুঁড়ি বৃষ্টি'],61:['🌧️','হালকা বৃষ্টি'],63:['🌧️','মাঝারি বৃষ্টি'],65:['🌧️','ভারী বৃষ্টি'],80:['🌦️','হালকা ঝড়ো বৃষ্টি'],81:['🌧️','ঝড়ো বৃষ্টি'],82:['⛈️','প্রবল বৃষ্টি'],95:['⛈️','বজ্রঝড়'],96:['⛈️','শিলাবৃষ্টিসহ বজ্রঝড়'],99:['⛈️','শিলাবৃষ্টিসহ বজ্রঝড়']};
+const wc=c=>WC[c]||(c>=71&&c<=77?['❄️','তুষারপাত']:['☁️','মেঘলা']);
+const hm=s=>new Date(s).toLocaleTimeString('bn-BD',{hour:'numeric',minute:'2-digit',hour12:true});
+const dn=s=>new Date(s+'T12:00').toLocaleDateString('bn-BD',{weekday:'long'});
+function bar(label,v,color){v=Math.max(0,Math.min(100,Math.round(v)));return `<div class="bar"><span>${label}</span><div class="track"><div class="fill" style="width:${v}%;background:${color}"></div></div><span>${bn(v)}%</span></div>`}
+function render(d,name){
+  const c=d.current,h=d.hourly,dl=d.daily;
+  const nowT=c.time;let i=h.time.findIndex(t=>t>=nowT.slice(0,13));if(i<0)i=0;
+  const [ic,tx]=wc(c.weather_code);
+  let html=`<div class="now"><div class="ic">${ic}</div><div class="t">${bn(c.temperature_2m)}°</div><div class="d">${tx}</div>
+  <div class="chips"><span class="chip">অনুভূত <b>${bn(c.apparent_temperature)}°</b></span><span class="chip">আর্দ্রতা <b>${bn(c.relative_humidity_2m)}%</b></span><span class="chip">বাতাস <b>${bn(c.wind_speed_10m)} কিমি/ঘ</b></span><span class="chip">সূর্যোদয় <b>${hm(dl.sunrise[0])}</b></span><span class="chip">সূর্যাস্ত <b>${hm(dl.sunset[0])}</b></span></div></div>`;
+  html+=`<h2>আগামী ৫ ঘণ্টা</h2><div class="note">রোদ = ১০০% − মেঘ (দিনে); বৃষ্টি = পূর্বাভাসে বৃষ্টির সম্ভাবনা; ঝড় = বজ্রঝড়ের পূর্বাভাস/দমকা হাওয়া থেকে হিসাব।</div>`;
+  for(let k=i;k<i+5&&k<h.time.length;k++){
+    const day=h.is_day[k]===1,cloud=h.cloud_cover[k],rain=h.precipitation_probability[k]??0,code=h.weather_code[k],gust=h.wind_gusts_10m[k];
+    const storm=code>=95?Math.max(rain,70):Math.min(60,Math.max(0,(gust-40)*3));
+    const [hi]=wc(code);
+    html+=`<div class="hr"><div class="row1"><span class="tm">${hi} ${hm(h.time[k])}</span><span>${bn(h.temperature_2m[k])}°</span></div>`
+    +bar(day?'☀️ রোদ':'🌙 পরিষ্কার',100-cloud,'var(--sun)')+bar('☁️ মেঘ',cloud,'var(--cloud)')+bar('🌧️ বৃষ্টি',rain,'var(--rain)')+bar('⛈️ ঝড়',storm,'var(--storm)')+`</div>`;
+  }
+  html+=`<h2>আগামী ৭ দিন</h2>`;
+  for(let k=0;k<dl.time.length;k++){
+    const [di]=wc(dl.weather_code[k]);
+    html+=`<div class="day"><span>${k===0?'আজ':dn(dl.time[k])}</span><span>${di}</span><span class="rn">🌧️ ${bn(dl.precipitation_probability_max[k]??0)}% · ${bn(dl.precipitation_sum[k],{maximumFractionDigits:1})} মিমি</span><span><span class="mx">${bn(dl.temperature_2m_max[k])}°</span> <span class="mn">${bn(dl.temperature_2m_min[k])}°</span></span></div>`;
+  }
+  $('app').innerHTML=html;$('place').textContent=name;$('upd').textContent='আপডেট: '+hm(Date.now());
+}
+async function load(lat,lon){
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code,cloud_cover,wind_gusts_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset`;
+  let name=`${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  try{const g=await(await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=bn`)).json();name=[g.locality||g.city,g.principalSubdivision].filter(Boolean).join(', ')||name}catch(e){}
+  try{const d=await(await fetch(u)).json();if(!d.current)throw 0;try{localStorage.setItem('wx',JSON.stringify({d,name}))}catch(e){}render(d,name)}
+  catch(e){let s;try{s=JSON.parse(localStorage.getItem('wx'))}catch(x){}
+    if(s){render(s.d,s.name+' (আগের তথ্য)')}else $('app').innerHTML='<div class="msg">ইন্টারনেট সংযোগ নেই। সংযোগ চালু করে রিফ্রেশ চাপুন।</div>'}
+}
+function start(){
+  $('place').textContent='অবস্থান খোঁজা হচ্ছে…';
+  if(!navigator.geolocation){$('app').innerHTML='<div class="msg">এই ডিভাইসে লোকেশন সাপোর্ট নেই।</div>';return}
+  navigator.geolocation.getCurrentPosition(p=>load(p.coords.latitude,p.coords.longitude),
+    ()=>{$('place').textContent='লোকেশন বন্ধ';$('app').innerHTML='<div class="msg">লোকেশন অনুমতি দেওয়া হয়নি। ফোনের সেটিংসে এই অ্যাপের জন্য Location চালু করে রিফ্রেশ চাপুন।</div>'},
+    {enableHighAccuracy:true,timeout:15000,maximumAge:300000});
+}
+$('re').onclick=start;start();
+setInterval(()=>{if(!document.hidden)start()},1800000);
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
