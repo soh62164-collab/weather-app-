@@ -86,10 +86,7 @@ function render(d,name,d2){
 async function load(lat,lon){
   const u=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code,cloud_cover,wind_gusts_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset`;
   let name=`${lat.toFixed(3)}, ${lon.toFixed(3)}`;
-  try{const r=await(await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&addressdetails=1&accept-language=bn&lat=${lat}&lon=${lon}`)).json();const a=r.address||{};
-    const parts=[a.village||a.hamlet||a.suburb||a.neighbourhood||a.locality,a.county||a.city_district||a.town||a.city,a.state_district].filter(Boolean);
-    const u2=[...new Set(parts)];if(u2.length>1)name=u2.join(', ')}catch(e){}
-  if(name.includes(',')===false||name.match(/^-?\d/)){try{const g=await(await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=bn`)).json();name=[g.locality||g.city,g.principalSubdivision].filter(Boolean).join(', ')||name}catch(e){}}
+  try{const g=await(await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=bn`)).json();name=[g.locality||g.city,g.principalSubdivision].filter(Boolean).join(', ')||name}catch(e){}
   try{const my=localStorage.getItem('myplace');if(my)name=my}catch(e){}
   try{const d=await(await fetch(u)).json();if(!d.current)throw 0;let d2=null;try{d2=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&models=${MD.join(',')}&hourly=precipitation,temperature_2m&daily=precipitation_sum`)).json();if(!d2.hourly)d2=null}catch(e){}try{localStorage.setItem('wx',JSON.stringify({d,d2,name}))}catch(e){}render(d,name,d2)}
   catch(e){let s;try{s=JSON.parse(localStorage.getItem('wx'))}catch(x){}
